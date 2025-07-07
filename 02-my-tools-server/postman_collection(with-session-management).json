@@ -1,0 +1,506 @@
+{
+	"info": {
+		"name": "MCP Defining Tools",
+		"description": "Educational Postman collection for testing MCP servers with multiple tools. Demonstrates tool discovery and execution for calculator and greeter tools.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "01. Initialize MCP Server",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"initialize\",\n    \"params\": {\n        \"protocolVersion\": \"2025-03-26\",\n        \"clientInfo\": {\n            \"name\": \"postman-client\",\n            \"version\": \"1.0.0\"\n        },\n        \"capabilities\": {}\n    },\n    \"id\": 1\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp", ""]
+				},
+				"description": "Initialize the MCP server connection. This establishes protocol version and exchanges capabilities.",
+				"event": [
+					{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"// Auto-capture session ID from response headers",
+								"const sessionId = pm.response.headers.get('Mcp-Session-Id');",
+								"if (sessionId) {",
+								"    pm.environment.set('sessionId', sessionId);",
+								"    console.log('Session ID captured: ' + sessionId);",
+								"} else {",
+								"    console.log('No session ID found in response headers');",
+								"}"
+							],
+							"type": "text/javascript"
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "01.5 Send Initialized Notification",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response (if any)"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"notifications/initialized\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp", ""]
+				},
+				"description": "REQUIRED: Send initialized notification to complete the initialization handshake. This must be sent after successful initialization."
+			}
+		},
+		{
+			"name": "02. Discover Available Tools",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tools/list\",\n    \"params\": {},\n    \"id\": 1\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp"]
+				},
+				"description": "Discover what tools the server provides. Should return 'add' and 'greet' tools with their schemas and descriptions."
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Parse SSE response for MCP tools/list",
+							"const responseText = pm.response.text();",
+							"console.log('Raw response:', responseText);",
+							"",
+							"// Look for 'data: ' prefix in SSE response",
+							"const lines = responseText.split('\\n');",
+							"for (const line of lines) {",
+							"    if (line.startsWith('data: ')) {",
+							"        try {",
+							"            const jsonData = JSON.parse(line.substring(6));",
+							"            console.log('Parsed JSON data:', JSON.stringify(jsonData, null, 2));",
+							"            ",
+							"            if (jsonData.result && jsonData.result.tools) {",
+							"                console.log('Found tools:', jsonData.result.tools.length);",
+							"                jsonData.result.tools.forEach((tool, index) => {",
+							"                    console.log(`Tool ${index + 1}: ${tool.name} - ${tool.description}`);",
+							"                });",
+							"            }",
+							"        } catch (e) {",
+							"            console.log('Error parsing JSON:', e.message);",
+							"        }",
+							"        break;",
+							"    }",
+							"}",
+							"",
+							"// Set visual indicator",
+							"if (pm.response.code === 200) {",
+							"    pm.test('MCP tools/list request successful', function () {",
+							"        pm.response.to.have.status(200);",
+							"    });",
+							"} else {",
+							"    pm.test('Request failed with status ' + pm.response.code, function () {",
+							"        pm.response.to.have.status(200);",
+							"    });",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			]
+		},
+		{
+			"name": "03. Call Add Tool (Basic)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tools/call\",\n    \"params\": {\n        \"name\": \"add\",\n        \"arguments\": {\n            \"a\": 5,\n            \"b\": 7\n        }\n    },\n    \"id\": 2\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp"]
+				},
+				"description": "Execute the add tool with numbers 5 and 7. Should return 12."
+			}
+		},
+		{
+			"name": "04. Call Add Tool (Large Numbers)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tools/call\",\n    \"params\": {\n        \"name\": \"add\",\n        \"arguments\": {\n            \"a\": 1000,\n            \"b\": 2500\n        }\n    },\n    \"id\": 3\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp"]
+				},
+				"description": "Test the add tool with larger numbers. Should return 3500."
+			}
+		},
+		{
+			"name": "05. Call Add Tool (Negative Numbers)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tools/call\",\n    \"params\": {\n        \"name\": \"add\",\n        \"arguments\": {\n            \"a\": -10,\n            \"b\": 15\n        }\n    },\n    \"id\": 4\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp"]
+				},
+				"description": "Test the add tool with negative numbers. Should return 5."
+			}
+		},
+		{
+			"name": "06. Call Greet Tool (Basic)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tools/call\",\n    \"params\": {\n        \"name\": \"greet\",\n        \"arguments\": {\n            \"name\": \"Student\"\n        }\n    },\n    \"id\": 5\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp"]
+				},
+				"description": "Execute the greet tool with name 'Student'. Should return a personalized greeting."
+			}
+		},
+		{
+			"name": "07. Call Greet Tool (Different Names)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tools/call\",\n    \"params\": {\n        \"name\": \"greet\",\n        \"arguments\": {\n            \"name\": \"Alice\"\n        }\n    },\n    \"id\": 6\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp"]
+				},
+				"description": "Test the greet tool with a different name. Try changing 'Alice' to other names!"
+			}
+		},
+		{
+			"name": "08. Error: Invalid Tool Name",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tools/call\",\n    \"params\": {\n        \"name\": \"nonexistent_tool\",\n        \"arguments\": {}\n    },\n    \"id\": 7\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp"]
+				},
+				"description": "Test error handling by calling a tool that doesn't exist. Should return an error response."
+			}
+		},
+		{
+			"name": "09. Error: Missing Required Parameter",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tools/call\",\n    \"params\": {\n        \"name\": \"add\",\n        \"arguments\": {\n            \"a\": 5\n        }\n    },\n    \"id\": 8\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp"]
+				},
+				"description": "Test error handling by omitting required parameter 'b' for the add tool. Should return a validation error."
+			}
+		},
+		{
+			"name": "10. Error: Wrong Parameter Type",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tools/call\",\n    \"params\": {\n        \"name\": \"add\",\n        \"arguments\": {\n            \"a\": \"hello\",\n            \"b\": \"world\"\n        }\n    },\n    \"id\": 9\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp"]
+				},
+				"description": "Test error handling by passing strings instead of integers to the add tool. Should return a type validation error."
+			}
+		},
+		{
+			"name": "11. Error: Empty Name for Greet",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/event-stream"
+					},
+					{
+						"key": "Mcp-Session-Id",
+						"value": "{{sessionId}}",
+						"description": "Session ID from initialization response"
+					},
+					{
+						"key": "MCP-Protocol-Version",
+						"value": "2025-03-26",
+						"description": "Required MCP protocol version header"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tools/call\",\n    \"params\": {\n        \"name\": \"greet\",\n        \"arguments\": {\n            \"name\": \"\"\n        }\n    },\n    \"id\": 10\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/mcp/",
+					"host": ["{{baseUrl}}"],
+					"path": ["mcp"]
+				},
+				"description": "Test the greet tool with an empty name. Should still work but return a greeting with an empty name."
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "sessionId",
+			"value": "",
+			"type": "string"
+		}
+	]
+} 

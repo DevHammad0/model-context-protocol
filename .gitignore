@@ -1,0 +1,17 @@
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+
+
+daca_teaching_bot_/
+mcp_over_http/
+openai_agents_sdk_with_mcp/
