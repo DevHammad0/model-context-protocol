@@ -117,9 +117,9 @@ if __name__ == "__main__":
 
 ## Common Pitfalls
 
-* **Forgetting Checkpoints:** Long loops without `await` won’t see cancellation.
+* **Forgetting Checkpoints:** Missing Pauses: If your code runs without any `await`, it never checks for cancellation signals.
 * **Sending a Response After Cancel:** Violates protocol—don’t reply to a cancelled `id`.
-* **Cancelling the Wrong Direction:** Only cancel requests you originally initiated.
+* **Cancelling the Wrong Direction:** Only send a cancel notice for calls you started yourself.
 
 ---
 
