@@ -49,7 +49,7 @@ The server will return the next set plus, again, a `nextCursor` if there’s sti
 
 ## 4. Pagination Loop
 
-![MCP Pagination Flow](image.png)
+<img src="image.png" alt="MCP Pagination Flow" width="400">
 
 Here’s the same pagination loop spelled out step-by-step:
 
