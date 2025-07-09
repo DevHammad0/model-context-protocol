@@ -19,6 +19,8 @@ async def mock_sampler(context: RequestContext["ClientSession", Any], params: Cr
     if params.messages and len(params.messages) > 0:
         message_content = params.messages[0].content.text if hasattr(params.messages[0].content, 'text') else str(params.messages[0].content)
         
+        print(f"-> Server Parameters Message Content Recieved: '{message_content}'.")
+        
         # Check if this is a summarization request
         if "Summarize this document" in message_content:
             mock_llm_response = (
